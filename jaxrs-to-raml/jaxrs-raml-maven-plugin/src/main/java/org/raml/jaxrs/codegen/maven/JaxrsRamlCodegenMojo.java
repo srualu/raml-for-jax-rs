@@ -15,15 +15,10 @@
  */
 package org.raml.jaxrs.codegen.maven;
 
-import static org.apache.maven.plugins.annotations.ResolutionScope.COMPILE_PLUS_RUNTIME;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
+import com.mulesoft.jaxrs.raml.annotation.model.IRamlConfig;
+import com.mulesoft.jaxrs.raml.annotation.model.ITypeModel;
+import com.mulesoft.jaxrs.raml.annotation.model.ResourceVisitor;
+import com.mulesoft.jaxrs.raml.annotation.model.reflection.RuntimeResourceVisitor;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
@@ -34,18 +29,23 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.compiler.util.scan.InclusionScanException;
+import org.codehaus.plexus.compiler.util.scan.SimpleSourceInclusionScanner;
+import org.codehaus.plexus.compiler.util.scan.SourceInclusionScanner;
+import org.codehaus.plexus.compiler.util.scan.mapping.SuffixMapping;
 import org.raml.jaxrs.codegen.spoon.SpoonProcessor;
-
-import com.mulesoft.jaxrs.raml.annotation.model.IRamlConfig;
-import com.mulesoft.jaxrs.raml.annotation.model.ITypeModel;
-import com.mulesoft.jaxrs.raml.annotation.model.ResourceVisitor;
-import com.mulesoft.jaxrs.raml.annotation.model.reflection.RuntimeResourceVisitor;
-
 import spoon.Launcher;
 import spoon.reflect.declaration.CtPackage;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.factory.Factory;
 import spoon.reflect.factory.PackageFactory;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.*;
+
+import static org.apache.maven.plugins.annotations.ResolutionScope.COMPILE_PLUS_RUNTIME;
 
 /**
  * When invoked, this goals read one or more JAX-RS annotated Java
@@ -69,12 +69,18 @@ public class JaxrsRamlCodegenMojo extends AbstractMojo {
 	 */
 	@Parameter(property = "sourceDirectory", defaultValue = "${basedir}/src/main/java")
 	private File sourceDirectory;
-	
+
 	/**
-     * An array of locations of the JAX-RS file(s).
-     */
-    @Parameter(property = "sourcePaths")
-    private File[] sourcePaths;
+	 * A list of inclusion filters for spoon.
+	 */
+	@Parameter
+	private Set<String> includes = new HashSet<String>();
+
+	/**
+	 * A list of exclusion filters for spoon.
+	 */
+	@Parameter
+	private Set<String> excludes = new HashSet<String>();
     
     /**
      * Generated RAML file.
@@ -91,8 +97,6 @@ public class JaxrsRamlCodegenMojo extends AbstractMojo {
     @Parameter(property = "removeOldOutput", defaultValue = "false")
     private boolean removeOldOutput;
     
-    
-
 	/**
      * API title
      */
@@ -236,19 +240,46 @@ l0:			for(CtPackage pkg : allRoots){
 		return arr;
 	}
 
-	private String getInputValue() {
+	private String getInputValue() throws MojoExecutionException {
 		
-		if(sourcePaths!=null&&sourcePaths.length!=0){
-			StringBuilder bld = new StringBuilder(); 
-			for(File f : sourcePaths){
+		try {
+			StringBuilder bld = new StringBuilder();
+			Set<File> includedSources = getSourceInclusionScanner(".*").getIncludedSources(sourceDirectory, null);
+            getLog().debug("Included Sources: " + includedSources);
+            for(File f : includedSources){
 				bld.append(f.getAbsolutePath()).append(pathSeparator);
 			}
-			String result = bld.substring(0, bld.length()-pathSeparator.length());
-			return result;			
+			String result = bld.substring(0, bld.length() - pathSeparator.length());
+			return result;
+		} catch (InclusionScanException e) {
+			throw new MojoExecutionException("Error scanning source root: \'" + sourceDirectory, e );
 		}
-		String result = sourceDirectory.getAbsolutePath();		
-		return result;
 	}
+
+    protected SourceInclusionScanner getSourceInclusionScanner( String inputFileEnding )
+    {
+		SourceInclusionScanner scanner;
+
+		// it's not defined if we get the ending with or without the dot '.'
+		String defaultIncludePattern = "**/*" + ( inputFileEnding.startsWith( "." ) ? "" : "." ) + inputFileEnding;
+
+		if ( includes.isEmpty() && excludes.isEmpty() )
+		{
+			includes = Collections.singleton( defaultIncludePattern );
+			scanner = new SimpleSourceInclusionScanner( includes, Collections.<String>emptySet() );
+		}
+		else
+		{
+			if ( includes.isEmpty() )
+			{
+				includes.add( defaultIncludePattern );
+			}
+			scanner = new SimpleSourceInclusionScanner( includes, excludes );
+		}
+        scanner.addSourceMapping(new SuffixMapping( ".*", ".*" ));
+
+		return scanner;
+    }
 
 	private String getSourceClassPath() {
 		
@@ -280,14 +311,6 @@ l0:			for(CtPackage pkg : allRoots){
 
 	public void setSourceDirectory(File sourceDirectory) {
 		this.sourceDirectory = sourceDirectory;
-	}
-
-	public File[] getSourcePaths() {
-		return sourcePaths;
-	}
-
-	public void setSourcePaths(File[] sourcePaths) {
-		this.sourcePaths = sourcePaths;
 	}
 
 	public File getOutputFile() {
