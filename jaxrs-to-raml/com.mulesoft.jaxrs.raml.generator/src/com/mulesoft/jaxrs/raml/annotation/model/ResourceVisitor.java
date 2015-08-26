@@ -513,19 +513,20 @@ public abstract class ResourceVisitor {
 				if (s.contains(FORM)) {
 					for (IParameterModel pm : parameters) {
 						if (pm.hasAnnotation(FORM_PARAM)) {
-							IAnnotationModel paramAnnotation = pm.getAnnotation(FORM_PARAM);							
+							IAnnotationModel paramAnnotation = pm.getAnnotation(FORM_PARAM);
 							FormParameter vl = new FormParameter();
-							String paramName = configureParam(pm,vl,documentation,paramAnnotation);							
+							String paramName = configureParam(pm, vl, documentation, paramAnnotation);
 							ArrayList<FormParameter> arrayList = new ArrayList<FormParameter>();
 							arrayList.add(vl);
 							if (bodyType.getFormParameters() == null) {
 								bodyType.setFormParameters(new HashMap<String, java.util.List<FormParameter>>());
 							}
-							bodyType.getFormParameters().put(paramName,	arrayList);
+							bodyType.getFormParameters().put(paramName, arrayList);
 						}
 					}
 				}
 				action.getBody().put(s, bodyType);
+
 			}
 		}
 	}
@@ -533,10 +534,10 @@ public abstract class ResourceVisitor {
 	private void tryAppendSchemesAndExamples(MimeType bodyType, String mediaType, String typeName, StructureType st) {
 		
 		ArrayList<String> mediaTypes = new ArrayList<String>();
-		if (mediaType.contains(XML)) {
+		if (mediaType.contains(XML) || mediaType.contains("multipart")) {
 			mediaTypes.add(XML);
 		}
-		if(mediaType.contains(JSON)){
+		if(mediaType.contains(JSON) || mediaType.contains("multipart")){
 			mediaTypes.add(JSON);
 		}
 		

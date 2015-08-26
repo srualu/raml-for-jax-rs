@@ -33,7 +33,7 @@ public class AnnotationModel implements IAnnotationModel{
 	
 	private HashMap<String,Object> stringValues;
 	
-	private HashMap<String,IAnnotationModel[]> annotationArrayValues;
+	public HashMap<String,IAnnotationModel[]> annotationArrayValues;
 
 	/**
 	 * <p>Constructor for AnnotationModel.</p>

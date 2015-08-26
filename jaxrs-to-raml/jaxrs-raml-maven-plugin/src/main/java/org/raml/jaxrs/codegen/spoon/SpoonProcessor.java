@@ -193,6 +193,18 @@ public class SpoonProcessor{
 			if(param_.hasAnnotation("Context")){
 				continue;
 			}
+			if(param_.hasAnnotation("ApiMultipartParam")){
+				IAnnotationModel a = param_.getAnnotation("ApiMultipartParam");
+				if(a != null) {
+					IAnnotationModel[] bodyParts = ((AnnotationModel) a).annotationArrayValues.get("value");
+					if(bodyParts !=null) {
+						for (IAnnotationModel bodyPart : bodyParts) {
+							paramType = bodyPart.getValue("classValue");
+						}
+					}
+				}
+
+			}
 			
 			ITypeModel type = registry.getType(paramType);
 			if(type==null){
@@ -281,8 +293,20 @@ public class SpoonProcessor{
 			}
 			Set<CtMethod<?>> methods = ((CtType<?>)classElement).getMethods();
 			for(CtMethod<?> m : methods){
-				IMethodModel methodModel = processMethod(m,type);
-				type.addMethod(methodModel);
+				boolean ignoreMethod = false;
+				for(CtAnnotation<? extends Annotation> a : m.getAnnotations() ){
+					String name = a.getActualAnnotation().annotationType().getSimpleName();
+					if(name.contains("DocExclude")){
+						ignoreMethod = true;
+						break;
+					}
+					//IAnnotationModel annotationModel = processAnnotation(a);
+					//model.addAnnotation(annotationModel);
+				}
+				if(!ignoreMethod) {
+					IMethodModel methodModel = processMethod(m, type);
+					type.addMethod(methodModel);
+				}
 			}
 			Collection<CtField<?>> fields = ((CtType<?>)classElement).getFields();
 			for(CtField<?> m : fields){
